@@ -33,6 +33,14 @@ public class Opacity implements IDrawCommand {
      * @param canvas the Graphics2D canvas on which the drawing operation will be performed
      */
     public void execute(Graphics2D canvas) {
+        if (rect.width == 0 || rect.height == 0 || opacity >= 1)
+        {
+            for (IDrawCommand cmd : children) {
+                cmd.draw(canvas, 0);
+            }
+            return;
+        }
+
         BufferedImage offscreenImage = new BufferedImage(rect.width, rect.height, BufferedImage.TYPE_INT_ARGB);
         Graphics2D graphics2D = offscreenImage.createGraphics();
 

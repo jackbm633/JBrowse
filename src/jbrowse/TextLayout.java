@@ -111,7 +111,9 @@ public class TextLayout implements ILayoutNode {
     public List<IDrawCommand> paint() {
         org.silentsoft.csscolor4j.Color c = org.silentsoft.csscolor4j.Color.valueOf(node.getStyle().get("color"));
         Color color = new Color(c.getRed(), c.getGreen(), c.getBlue(), (int)(c.getOpacity() * 255));
-        return List.of(new DrawText(x, y, word, font, fontMetrics, color));
+        List<IDrawCommand> iDrawCommands = new ArrayList<>();
+        iDrawCommands.add(new DrawText(x, y, word, font, fontMetrics, color));
+        return iDrawCommands;
     }
 
     @Override

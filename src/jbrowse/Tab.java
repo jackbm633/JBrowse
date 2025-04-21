@@ -218,21 +218,23 @@ public final class Tab {
     }
 
 
-    private void paintTree(ILayoutNode layoutObject, List<IDrawCommand> displayList) {
+    private void paintTree(ILayoutNode layoutObject, List<IDrawCommand> dispList) {
         List<IDrawCommand> paintList = new ArrayList<>();
         if (layoutObject.shouldPaint()) {
             paintList = layoutObject.paint();
         }
 
         for (ILayoutNode child : layoutObject.getChildren()) {
-            paintTree(child, displayList);
+            paintTree(child, paintList);
         }
 
         if (layoutObject.shouldPaint())
         {
             paintList = layoutObject.paintEffects(paintList);
         }
-        displayList.addAll(paintList);
+        dispList.addAll(paintList);
+
+
     }
 
     private void printTree(INode node, int indent) {

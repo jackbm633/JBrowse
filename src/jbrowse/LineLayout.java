@@ -115,7 +115,7 @@ public class LineLayout implements ILayoutNode {
 
     @Override
     public List<IDrawCommand> paint() {
-        return List.of();
+        return new ArrayList<>();
     }
 
     @Override

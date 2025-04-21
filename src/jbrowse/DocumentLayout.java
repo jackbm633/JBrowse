@@ -73,7 +73,7 @@ public class DocumentLayout implements ILayoutNode {
 
     @Override
     public List<IDrawCommand> paint() {
-        return List.of();
+        return new ArrayList<>(List.of());
     }
 
     @Override

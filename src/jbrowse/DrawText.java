@@ -24,7 +24,9 @@ public record DrawText(int x1, int y1, String text, Font f, FontMetrics fm, Colo
     @Override
     public Rectangle getRect() {
         Graphics2D bufferedGraphics = (Graphics2D) new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB).getGraphics();
-        return fm.getStringBounds(text, bufferedGraphics).getBounds();
+        var rect = fm.getStringBounds(text, bufferedGraphics).getBounds();
+        rect.setLocation(x1, y1);
+        return rect;
     }
 
 
