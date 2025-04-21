@@ -36,4 +36,8 @@ public class DrawLine implements IDrawCommand {
     public int getTop() {
         return 0;
     }
+
+    public Rectangle getRect() {
+        return new Rectangle(x1, y1, x2 - x1, y2 - y1);
+    }
 }

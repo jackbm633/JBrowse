@@ -306,7 +306,6 @@ public class BlockLayout implements ILayoutNode {
         }
         return cmds;
     }
-
     @Override
     public INode getNode() {
         return node;

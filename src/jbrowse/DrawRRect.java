@@ -21,4 +21,9 @@ public record DrawRRect(Rectangle r, int radius, Color color)  implements  IDraw
     public int getTop() {
         return r.y;
     }
+
+    @Override
+    public Rectangle getRect() {
+        return r;
+    }
 }

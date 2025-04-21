@@ -8,4 +8,6 @@ public interface IDrawCommand {
     int getBottom();
 
     int getTop();
+
+    Rectangle getRect();
 }

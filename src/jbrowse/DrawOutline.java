@@ -29,4 +29,9 @@ public class DrawOutline implements IDrawCommand {
     public int getTop() {
         return 0;
     }
+
+    @Override
+    public Rectangle getRect() {
+        return newtabRect;
+    }
 }

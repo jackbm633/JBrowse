@@ -1,6 +1,7 @@
 package jbrowse;
 
 import java.awt.*;
+import java.awt.image.BufferedImage;
 
 public record DrawText(int x1, int y1, String text, Font f, FontMetrics fm, Color c) implements IDrawCommand{
     @Override
@@ -18,6 +19,12 @@ public record DrawText(int x1, int y1, String text, Font f, FontMetrics fm, Colo
     @Override
     public int getTop() {
         return y1;
+    }
+
+    @Override
+    public Rectangle getRect() {
+        Graphics2D bufferedGraphics = (Graphics2D) new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB).getGraphics();
+        return fm.getStringBounds(text, bufferedGraphics).getBounds();
     }
 
 
