@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="silentsoft.csscolor4j" type="repository">
+    <properties maven-id="org.silentsoft:csscolor4j:1.0.0" />
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/silentsoft/csscolor4j/1.0.0/csscolor4j-1.0.0.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

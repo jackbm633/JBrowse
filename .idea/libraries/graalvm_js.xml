@@ -1,0 +1,14 @@
+<component name="libraryTable">
+  <library name="graalvm.js" type="repository">
+    <properties maven-id="org.graalvm.js:js:23.0.7" />
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/graalvm/js/js/23.0.7/js-23.0.7.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/org/graalvm/regex/regex/23.0.7/regex-23.0.7.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/org/graalvm/truffle/truffle-api/23.0.7/truffle-api-23.0.7.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/org/graalvm/sdk/graal-sdk/23.0.7/graal-sdk-23.0.7.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/com/ibm/icu/icu4j/72.1/icu4j-72.1.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

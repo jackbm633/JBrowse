@@ -1,0 +1,5 @@
+package jbrowse
+
+class Opacity {
+
+}
