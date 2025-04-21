@@ -155,4 +155,22 @@ public class InputLayout implements ILayoutNode {
     public boolean shouldPaint() {
         return true;
     }
+
+    public List<IDrawCommand> paintEffects(List<IDrawCommand> cmds)
+    {
+        cmds = paintVisualEffects(node, cmds, selfRect());
+        return cmds;
+    }
+
+    private Rectangle selfRect() {
+        return new Rectangle(x, y, INPUT_WIDTH_PX, height);
+    }
+
+    public static List<IDrawCommand> paintVisualEffects(INode node, List<IDrawCommand> cmds, Rectangle rectangle) {
+        double opacity = Double.parseDouble(node.getStyle().getOrDefault("opacity","1.0"));
+
+        var returnList = new ArrayList<IDrawCommand>();
+        returnList.add(new Opacity(opacity, cmds));
+        return returnList;
+    }
 }

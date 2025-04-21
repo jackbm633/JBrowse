@@ -18,6 +18,8 @@ public interface ILayoutNode {
     List<ILayoutNode> getChildren();
 
     List<IDrawCommand> paint();
+
+    List<IDrawCommand> paintEffects(List<IDrawCommand> paintList);
     INode getNode();
 
     boolean shouldPaint();

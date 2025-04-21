@@ -1,5 +1,6 @@
 package jbrowse;
 
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -125,5 +126,23 @@ public class LineLayout implements ILayoutNode {
     @Override
     public boolean shouldPaint() {
         return true;
+    }
+
+    public List<IDrawCommand> paintEffects(List<IDrawCommand> cmds)
+    {
+        cmds = paintVisualEffects(node, cmds, selfRect());
+        return cmds;
+    }
+
+    private Rectangle selfRect() {
+        return new Rectangle(x, y, width, height);
+    }
+
+    public static List<IDrawCommand> paintVisualEffects(INode node, List<IDrawCommand> cmds, Rectangle rectangle) {
+        double opacity = Double.parseDouble(node.getStyle().getOrDefault("opacity","1.0"));
+
+        var returnList = new ArrayList<IDrawCommand>();
+        returnList.add(new Opacity(opacity, cmds));
+        return returnList;
     }
 }
