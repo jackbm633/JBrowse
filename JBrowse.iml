@@ -11,5 +11,6 @@
     <orderEntry type="library" name="silentsoft.csscolor4j" level="project" />
     <orderEntry type="library" name="KotlinJavaRuntime" level="project" />
     <orderEntry type="library" name="graalvm.js" level="project" />
+    <orderEntry type="library" name="swinglabs.swingx.all" level="project" />
   </component>
 </module>

@@ -1,11 +1,11 @@
 package jbrowse;
 
+import org.jdesktop.swingx.graphics.BlendComposite;
+
 import javax.swing.*;
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.*;
 import java.util.List;
-import java.util.Objects;
 
 import static jbrowse.Tab.getFont;
 import static jbrowse.Tab.getFontMetricsFromCache;
@@ -319,9 +319,11 @@ public class BlockLayout implements ILayoutNode {
 
     public static List<IDrawCommand> paintVisualEffects(INode node, List<IDrawCommand> cmds, Rectangle rectangle) {
         double opacity = Double.parseDouble(node.getStyle().getOrDefault("opacity","1.0"));
-
+        BlendComposite bc = Browser.getCompositeFromBlendMode(node.getStyle().getOrDefault("mix-blend-mode", "normal"));
         var returnList = new ArrayList<IDrawCommand>();
-        returnList.add(new Opacity(opacity, cmds));
+        List<IDrawCommand> iDrawCommands = new ArrayList<>();
+        iDrawCommands.add(new Opacity(opacity, cmds));
+        returnList.add(new Blend(bc, iDrawCommands));
         return returnList;
     }
 

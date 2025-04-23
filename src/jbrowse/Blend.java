@@ -1,5 +1,6 @@
 package jbrowse;
 
+import org.jdesktop.swingx.graphics.BlendComposite;
 import org.jetbrains.annotations.NotNull;
 
 import java.awt.*;
@@ -12,13 +13,13 @@ import java.util.List;
  * of its children to an offscreen image and renders the composited image
  * with the specified opacity.
  */
-public class Opacity implements IDrawCommand {
-    private final double opacity;
+public class Blend implements IDrawCommand {
     private final List<IDrawCommand> children;
     private final Rectangle rect = new Rectangle();
+    private final BlendComposite composite;
 
-    public Opacity(double opacity, @NotNull List<IDrawCommand> children) {
-        this.opacity = opacity;
+    public Blend(BlendComposite composite, @NotNull List<IDrawCommand> children) {
+        this.composite = composite;
         this.children = children;
         for (IDrawCommand cmd : children) {
             rect.add(cmd.getRect());
@@ -33,7 +34,7 @@ public class Opacity implements IDrawCommand {
      * @param canvas the Graphics2D canvas on which the drawing operation will be performed
      */
     public void execute(Graphics2D canvas) {
-        if (rect.width == 0 || rect.height == 0 || opacity >= 1.0)
+        if (rect.width == 0 || rect.height == 0 || composite.getMode() == BlendComposite.BlendingMode.COLOR)
         {
             for (IDrawCommand cmd : children) {
                 cmd.draw(canvas, 0);
@@ -44,9 +45,9 @@ public class Opacity implements IDrawCommand {
         BufferedImage offscreenImage = new BufferedImage(rect.width, rect.height, BufferedImage.TYPE_INT_ARGB);
         Graphics2D graphics2D = offscreenImage.createGraphics();
 
-        graphics2D.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-        graphics2D.setRenderingHint(java.awt.RenderingHints.KEY_RENDERING, java.awt.RenderingHints.VALUE_RENDER_QUALITY);
-        graphics2D.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING, java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        graphics2D.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        graphics2D.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         // Apply coordinate translation to the graphics context so that we can draw the image
         graphics2D.translate(-rect.x, -rect.y);
 
@@ -57,8 +58,7 @@ public class Opacity implements IDrawCommand {
         graphics2D.dispose();
 
         // Now, draw the image onto the canvas with the correct opacity.
-        AlphaComposite ac = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) opacity);
-        canvas.setComposite(ac);
+        canvas.setComposite(composite);
         canvas.drawImage(offscreenImage, rect.x, rect.y, null);
         // Reset the composite to what it was before.
         canvas.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER));

@@ -1,5 +1,7 @@
 package jbrowse;
 
+import org.jdesktop.swingx.graphics.BlendComposite;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyEvent;
@@ -186,4 +188,15 @@ public class Browser {
     public void setActiveTab(Tab tab) {
         this.activeTab = tab;
     }
+
+    public static BlendComposite getCompositeFromBlendMode(String blendMode) {
+        if (blendMode.equals("multiply")) {
+            return BlendComposite.Multiply;
+        } else if (blendMode.equals("difference")) {
+            return BlendComposite.Difference;
+        } else {
+            return BlendComposite.Color;
+        }
+    }
+
 }
