@@ -1,5 +1,8 @@
 package jbrowse;
 
+import com.oracle.js.parser.ir.Block;
+import org.jdesktop.swingx.graphics.BlendComposite;
+
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
@@ -97,11 +100,7 @@ public class DocumentLayout implements ILayoutNode {
     }
 
     public static List<IDrawCommand> paintVisualEffects(INode node, List<IDrawCommand> cmds, Rectangle rectangle) {
-        double opacity = Double.parseDouble(node.getStyle().getOrDefault("opacity","1.0"));
-
-        var returnList = new ArrayList<IDrawCommand>();
-        returnList.add(new Opacity(opacity, cmds));
-        return returnList;
+        return BlockLayout.paintVisualEffects(node, cmds, rectangle);
     }
 
 

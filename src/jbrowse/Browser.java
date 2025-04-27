@@ -189,13 +189,13 @@ public class Browser {
         this.activeTab = tab;
     }
 
-    public static BlendComposite getCompositeFromBlendMode(String blendMode) {
+    public static Composite getCompositeFromBlendMode(String blendMode, float opacity) {
         if (blendMode.equals("multiply")) {
-            return BlendComposite.Multiply;
+            return BlendComposite.Multiply.derive(opacity);
         } else if (blendMode.equals("difference")) {
-            return BlendComposite.Difference;
+            return BlendComposite.Difference.derive(opacity);
         } else {
-            return BlendComposite.Color;
+            return AlphaComposite.SrcOver.derive(opacity);
         }
     }
 

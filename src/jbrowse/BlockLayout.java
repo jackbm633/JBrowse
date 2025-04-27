@@ -319,12 +319,16 @@ public class BlockLayout implements ILayoutNode {
 
     public static List<IDrawCommand> paintVisualEffects(INode node, List<IDrawCommand> cmds, Rectangle rectangle) {
         double opacity = Double.parseDouble(node.getStyle().getOrDefault("opacity","1.0"));
-        BlendComposite bc = Browser.getCompositeFromBlendMode(node.getStyle().getOrDefault("mix-blend-mode", "normal"));
-        var returnList = new ArrayList<IDrawCommand>();
+        if (node.getStyle().getOrDefault("overflow", "visible").equals("clip")) {
+            int borderRadius = Integer.parseInt(node.getStyle().getOrDefault("border-radius", "0").replace("px", ""));
+            List<IDrawCommand> roundRect = new ArrayList<>();
+            roundRect.add(new DrawRRect(rectangle, borderRadius, Color.BLACK));
+            cmds.add(new Blend(AlphaComposite.DstIn, roundRect));
+        }
+        Composite bc = Browser.getCompositeFromBlendMode(node.getStyle().getOrDefault("mix-blend-mode", "normal"), (float) opacity);
         List<IDrawCommand> iDrawCommands = new ArrayList<>();
-        iDrawCommands.add(new Opacity(opacity, cmds));
-        returnList.add(new Blend(bc, iDrawCommands));
-        return returnList;
+        iDrawCommands.add(new Blend(bc, cmds));
+        return iDrawCommands;
     }
 
     @Override

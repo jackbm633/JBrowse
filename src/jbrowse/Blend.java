@@ -15,15 +15,30 @@ import java.util.List;
  */
 public class Blend implements IDrawCommand {
     private final List<IDrawCommand> children;
-    private final Rectangle rect = new Rectangle();
-    private final BlendComposite composite;
+    private Rectangle rect;
+    private final Composite composite;
 
-    public Blend(BlendComposite composite, @NotNull List<IDrawCommand> children) {
+    public Blend(Composite composite, @NotNull List<IDrawCommand> children) {
         this.composite = composite;
         this.children = children;
         for (IDrawCommand cmd : children) {
-            rect.add(cmd.getRect());
-        }
+
+
+                if (rect == null)
+                {
+                    rect = cmd.getRect();
+                }
+                else
+                {
+                    var rct = cmd.getRect();
+                    if (rct != null)
+                    {
+                        rect.add(rct);
+                    }
+                }
+
+            }
+
     }
 
     /**
@@ -34,7 +49,7 @@ public class Blend implements IDrawCommand {
      * @param canvas the Graphics2D canvas on which the drawing operation will be performed
      */
     public void execute(Graphics2D canvas) {
-        if (rect.width == 0 || rect.height == 0 || composite.getMode() == BlendComposite.BlendingMode.COLOR)
+        if (rect == null || rect.width == 0 || rect.height == 0 || (composite instanceof AlphaComposite ac && ac.getAlpha() >= 1.0 && ac.getRule() != AlphaComposite.DST_IN))
         {
             for (IDrawCommand cmd : children) {
                 cmd.draw(canvas, 0);
@@ -51,6 +66,7 @@ public class Blend implements IDrawCommand {
         // Apply coordinate translation to the graphics context so that we can draw the image
         graphics2D.translate(-rect.x, -rect.y);
 
+
         for (IDrawCommand cmd : children) {
             cmd.draw(graphics2D, 0);
         }
@@ -58,10 +74,11 @@ public class Blend implements IDrawCommand {
         graphics2D.dispose();
 
         // Now, draw the image onto the canvas with the correct opacity.
+        var comp = canvas.getComposite();
         canvas.setComposite(composite);
         canvas.drawImage(offscreenImage, rect.x, rect.y, null);
         // Reset the composite to what it was before.
-        canvas.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER));
+        canvas.setComposite(comp);
     }
 
     @Override

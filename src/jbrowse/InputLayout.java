@@ -1,5 +1,7 @@
 package jbrowse;
 
+import org.jdesktop.swingx.graphics.BlendComposite;
+
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -167,10 +169,7 @@ public class InputLayout implements ILayoutNode {
     }
 
     public static List<IDrawCommand> paintVisualEffects(INode node, List<IDrawCommand> cmds, Rectangle rectangle) {
-        double opacity = Double.parseDouble(node.getStyle().getOrDefault("opacity","1.0"));
+        return BlockLayout.paintVisualEffects(node, cmds, rectangle);
 
-        var returnList = new ArrayList<IDrawCommand>();
-        returnList.add(new Opacity(opacity, cmds));
-        return returnList;
     }
 }
