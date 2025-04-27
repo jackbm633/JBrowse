@@ -9,6 +9,7 @@ import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import static java.util.Map.entry;
@@ -156,39 +157,63 @@ public final class Tab {
         scroll = 0;
         String body = url.request(payload);
         nodes = new HtmlParser(body).parse();
-        List<String> links = treeToLayoutList(nodes, new ArrayList<>()).stream().filter(s -> s instanceof Element e && Objects.equals(e.getTag(), "link") && Objects.equals(e.getAttributes().get("rel"), "stylesheet") && e.getAttributes().containsKey("href")).map(s -> ((Element) s).getAttributes().get("href")).toList();
-        List<String> scripts = treeToLayoutList(nodes, new ArrayList<>()).stream().filter(s -> s instanceof Element e && Objects.equals(e.getTag(), "script") && e.getAttributes().containsKey("src")).map(s -> ((Element) s).getAttributes().get("src")).toList();
+        List<String> links = treeToLayoutList(nodes, new ArrayList<>()).stream()
+                .filter(s -> s instanceof Element e &&
+                        Objects.equals(e.getTag(), "link") &&
+                        Objects.equals(e.getAttributes().get("rel"), "stylesheet") &&
+                        e.getAttributes().containsKey("href"))
+                .map(s -> ((Element) s).getAttributes().get("href"))
+                .toList();
+        List<String> scripts = treeToLayoutList(nodes, new ArrayList<>()).stream()
+                .filter(s -> s instanceof Element e &&
+                        Objects.equals(e.getTag(), "script") &&
+                        e.getAttributes().containsKey("src"))
+                .map(s -> ((Element) s).getAttributes().get("src"))
+                .toList();
+
         js = new JsContext(this);
-        for (String script : scripts) {
-            var scriptUrl = url.resolve(script);
-            String scriptBody = "";
-            try {
-                scriptBody = scriptUrl.request(null);
-                js.run(scriptUrl.toString(), scriptBody);
 
-            } catch (Exception ignored) {
-                continue;
-            }
+        // Start all JS tasks in parallel
+        List<CompletableFuture<?>> jsTasks = scripts.stream()
+                .map(script -> {
+                    try {
+                        var scriptUrl = url.resolve(script);
+                        String scriptBody = scriptUrl.request(null);
+                        return runJs(scriptUrl.toString(), scriptBody);
+                    } catch (Exception e) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                })
+                .toList();
 
-        }
 
+        // Continue with the rest of the loading process
         rules = new HashMap<>();
         defaultStyleSheet.forEach((selector, rule) -> {
             rules.put(selector, new HashMap<>());
             rule.forEach((key, value) -> rules.get(selector).put(key, value));
         });
 
+        // Load stylesheets
         links.forEach(l -> {
             URL styleUrl = url.resolve(l);
             try {
                 String styleBody = styleUrl.request(null);
                 rules.putAll(new CssParser(styleBody).parse());
             } catch (Exception ignored) {
-
             }
         });
 
         render();
+    }
+
+
+    private CompletableFuture<Void> runJs(String scriptUrl, String scriptBody) {
+        return CompletableFuture.runAsync(() -> {
+            try {
+                js.run(scriptUrl, scriptBody);
+            } catch (Exception ignored) {}
+        });
     }
 
     void render() {
