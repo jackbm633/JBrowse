@@ -54,61 +54,78 @@ public class URL {
 
     public final String request(String payload) throws NoSuchAlgorithmException, KeyManagementException, IOException {
         try (Socket s = getSocket()) {
-            var method = payload != null ? "POST" : "GET";
-            String request = method+" " + this.path + " HTTP/1.0\r\n";
-            if (payload != null) {
-                request += "Content-Length: " + payload.getBytes(StandardCharsets.UTF_8).length + "\r\n";
-            }
-            request = request + "Host: " + this.host + "\r\n" + "\r\n";
+            // Build request using StringBuilder
+            StringBuilder requestBuilder = new StringBuilder();
+            String method = payload != null ? "POST" : "GET";
+            requestBuilder.append(method)
+                    .append(" ")
+                    .append(this.path)
+                    .append(" HTTP/1.0\r\n");
 
             if (payload != null) {
-                request += payload;
+                requestBuilder.append("Content-Length: ")
+                        .append(payload.getBytes(StandardCharsets.UTF_8).length)
+                        .append("\r\n");
             }
-            try {
-                // Get the output stream and write the request.
-                s.getOutputStream().write(request.getBytes(StandardCharsets.UTF_8));
-                // Get the response from the server.
-                InputStream is = s.getInputStream();
-                Reader reader = new InputStreamReader(is, StandardCharsets.UTF_8);
-                BufferedReader response = new BufferedReader(reader, 8192);
-                // Get the status line from the response.
-                String statusLine = response.readLine();
-                if (statusLine == null) {
-                    throw new NullPointerException("Could not read status line from HTTP response");
-                }
-                // Then, get the response headers.
-                Map<String, String> responseHeaders = new LinkedHashMap<>();
 
-                while (true) {
-                    String line = response.readLine();
-                    if ("".equals(line)) {
-                        if (responseHeaders.containsKey("transfer-encoding") || responseHeaders.containsKey("content-encoding")) {
-                            throw new AssertionError("Cannot support transfer-encodinfg or content-encoding headers.");
-                        }
-                        StringWriter buffer = new StringWriter();
-                        char[] charBuffer = new char[8192];
-                        int readChars = response.read(charBuffer);
-                        while (readChars >= 0) {
-                            buffer.write(charBuffer, 0, readChars);
-                            readChars = response.read(charBuffer);
-                        }
-                        return buffer.toString();
-                    }
-                    if (line == null) {
-                        throw new NullPointerException("Could not read line from HTTP response");
-                    }
-                    List<String> headerComponents = Arrays.stream(line.split(":", 2)).toList();
-                    String header = headerComponents.getFirst().toLowerCase(Locale.ROOT);
-                    String value = headerComponents.get(1);
-                    responseHeaders.put(header, value);
-                }
+            requestBuilder.append("Host: ")
+                    .append(this.host)
+                    .append("\r\n\r\n");
 
-            } catch (Exception e) {
-                e.printStackTrace();
+            if (payload != null) {
+                requestBuilder.append(payload);
             }
+
+            // Write request
+            s.getOutputStream().write(requestBuilder.toString().getBytes(StandardCharsets.UTF_8));
+
+            // Read response using NIO
+            InputStream is = s.getInputStream();
+            ByteArrayOutputStream response = new ByteArrayOutputStream();
+            byte[] buffer = new byte[16384]; // Increased buffer size
+
+            // Read headers first
+            StringBuilder headerBuilder = new StringBuilder();
+            int b;
+            boolean headersDone = false;
+            int consecutiveNewlines = 0;
+
+            while ((b = is.read()) != -1) {
+                headerBuilder.append((char) b);
+                if (b == '\n') {
+                    consecutiveNewlines++;
+                    if (consecutiveNewlines == 2) {
+                        headersDone = true;
+                        break;
+                    }
+                } else if (b != '\r') {
+                    consecutiveNewlines = 0;
+                }
+            }
+
+            // Parse headers
+            String[] headerLines = headerBuilder.toString().split("\r\n");
+            if (headerLines.length == 0) {
+                throw new IOException("No response headers");
+            }
+
+            // Check for unsupported encodings
+            for (String headerLine : headerLines) {
+                String lowerHeader = headerLine.toLowerCase(Locale.ROOT);
+                if (lowerHeader.startsWith("transfer-encoding:") ||
+                        lowerHeader.startsWith("content-encoding:")) {
+                    throw new AssertionError("Cannot support transfer-encoding or content-encoding headers.");
+                }
+            }
+
+            // Read body
+            int bytesRead;
+            while ((bytesRead = is.read(buffer)) != -1) {
+                response.write(buffer, 0, bytesRead);
+            }
+
+            return response.toString(StandardCharsets.UTF_8);
         }
-
-        return null;
     }
 
     private Socket getSocket() throws NoSuchAlgorithmException, KeyManagementException, IOException {
@@ -121,6 +138,7 @@ public class URL {
         } else {
             s = new Socket(this.host, this.port);
         }
+        s.setTcpNoDelay(true);
         return s;
     }
 

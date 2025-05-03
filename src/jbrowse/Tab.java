@@ -10,6 +10,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import static java.util.Map.entry;
@@ -155,56 +157,127 @@ public final class Tab {
         this.url = url;
         history.add(url);
         scroll = 0;
-        String body = url.request(payload);
-        nodes = new HtmlParser(body).parse();
-        List<String> links = treeToLayoutList(nodes, new ArrayList<>()).stream()
-                .filter(s -> s instanceof Element e &&
-                        Objects.equals(e.getTag(), "link") &&
-                        Objects.equals(e.getAttributes().get("rel"), "stylesheet") &&
-                        e.getAttributes().containsKey("href"))
-                .map(s -> ((Element) s).getAttributes().get("href"))
-                .toList();
-        List<String> scripts = treeToLayoutList(nodes, new ArrayList<>()).stream()
-                .filter(s -> s instanceof Element e &&
-                        Objects.equals(e.getTag(), "script") &&
-                        e.getAttributes().containsKey("src"))
-                .map(s -> ((Element) s).getAttributes().get("src"))
-                .toList();
 
+        // 1. Fetch HTML
+        String body = url.request(payload);
+
+        // 2. Parse HTML
+        nodes = new HtmlParser(body).parse();
+
+        // 3. Extract CSS links and JS sources (Traverse once)
+        List<String> cssLinks = new ArrayList<>();
+        List<String> scriptSrcs = new ArrayList<>();
+        // The 'allNodes' list isn't strictly necessary if only links/scripts are needed,
+        // but kept here if the full list was used elsewhere implicitly.
+        // Consider removing List<INode> allNodes parameter if not needed.
+        List<INode> allNodes = new ArrayList<>();
+        extractLinksAndScripts(nodes, allNodes, cssLinks, scriptSrcs);
+
+        // 4. Initialize JsContext
         js = new JsContext(this);
 
-        // Start all JS tasks in parallel
-        List<CompletableFuture<?>> jsTasks = scripts.stream()
-                .map(script -> {
-                    try {
-                        var scriptUrl = url.resolve(script);
-                        String scriptBody = scriptUrl.request(null);
-                        return runJs(scriptUrl.toString(), scriptBody);
-                    } catch (Exception e) {
-                        return CompletableFuture.completedFuture(null);
-                    }
-                })
-                .toList();
+        System.out.println("JS1");
+        // 5. Start asynchronous JS fetching/execution tasks (run in background)
+        try (var jsExecutor = Executors.newSingleThreadScheduledExecutor()) {
+            List<CompletableFuture<Void>> jsFutures = scriptSrcs.stream()
+                    .map(script -> CompletableFuture.runAsync(() -> {
+                        try {
+                            var scriptUrl = url.resolve(script);
+                            // Consider making url.request() asynchronous if it's a bottleneck
+                            String scriptBody = scriptUrl.request(null); // Network I/O
+                            js.run(scriptUrl.toString(), scriptBody);   // JS Execution
+                        } catch (Exception e) {
+                            // Log or handle exception appropriately
+                            System.err.println("Failed to load or run script: " + script + " - " + e.getMessage());
+                        }
+                    }, jsExecutor))
+                    .toList();
 
 
-        // Continue with the rest of the loading process
-        rules = new HashMap<>();
-        defaultStyleSheet.forEach((selector, rule) -> {
-            rules.put(selector, new HashMap<>());
-            rule.forEach((key, value) -> rules.get(selector).put(key, value));
-        });
+            // We don't wait for JS completion here.
+            System.out.println("JS2");
 
-        // Load stylesheets
-        links.forEach(l -> {
-            URL styleUrl = url.resolve(l);
+            // 6. Initialize rules with default stylesheet (create copies)
+            rules = new HashMap<>();
+            defaultStyleSheet.forEach((selector, rule) -> {
+                rules.put(selector, new HashMap<>(rule)); // Create a new HashMap for each rule
+            });
+
+            // 7. Start asynchronous CSS fetching and parsing tasks
+            List<CompletableFuture<Map<ISelector, Map<String, String>>>> cssFutures = cssLinks.stream()
+                    .map(link -> CompletableFuture.supplyAsync(() -> {
+                        try {
+                            URL styleUrl = url.resolve(link);
+                            // Consider making url.request() asynchronous if it's a bottleneck
+                            String styleBody = styleUrl.request(null); // Network I/O
+                            return new CssParser(styleBody).parse(); // CPU-bound parsing
+                        } catch (Exception e) {
+                            // Log or handle exception appropriately
+                            System.err.println("Failed to load or parse stylesheet: " + link + " - " + e.getMessage());
+                            // Wrap checked exceptions for CompletableFuture
+                            // Return empty map on failure to avoid breaking the chain
+                            return Collections.<ISelector, Map<String, String>>emptyMap();
+                        }
+                    }))
+                    .toList();
+
+            // 8. Wait for all CSS tasks to complete
+            CompletableFuture<Void> allCssFutures = CompletableFuture.allOf(cssFutures.toArray(new CompletableFuture[0]));
+
             try {
-                String styleBody = styleUrl.request(null);
-                rules.putAll(new CssParser(styleBody).parse());
-            } catch (Exception ignored) {
+                // Block until all CSS futures are complete before proceeding to render
+                allCssFutures.join();
+            } catch (CompletionException e) {
+                // Handle exceptions that occurred during CSS processing
+                System.err.println("Error occurred during CSS loading/parsing: " + e.getCause());
+                // Decide how to proceed: render with partial/default styles or show an error
+            } catch (Exception e) {
+                System.err.println("Unexpected error waiting for CSS tasks: " + e.getMessage());
             }
-        });
 
-        render();
+
+            // 9. Merge the fetched CSS rules (ensure this happens after waiting)
+            // Use stream().map(CompletableFuture::join) which is safe now after allOf().join()
+            cssFutures.stream()
+                    .map(CompletableFuture::join) // Get results now that they are ready
+                    .forEach(fetchedRules -> rules.putAll(fetchedRules)); // Merge results into the main 'rules' map
+
+            // 10. Call render() only after CSS rules are processed
+            render();
+        }
+    }
+
+    /**
+     * Helper method to traverse the node tree once and extract CSS links and JS sources.
+     * @param node Current node to process.
+     * @param visited List to accumulate all nodes (optional, remove if not needed elsewhere).
+     * @param cssLinks List to accumulate CSS hrefs.
+     * @param scriptSrcs List to accumulate JS srcs.
+     */
+    private void extractLinksAndScripts(INode node, List<INode> visited, List<String> cssLinks, List<String> scriptSrcs) {
+        if (node == null) return;
+
+        visited.add(node); // Add current node to the visited list (if needed)
+
+        if (node instanceof Element e) {
+            String tag = e.getTag();
+            Map<String, String> attrs = e.getAttributes();
+            // Check for CSS links
+            if ("link".equals(tag) &&
+                "stylesheet".equals(attrs.get("rel")) &&
+                attrs.containsKey("href")) {
+                cssLinks.add(attrs.get("href"));
+            }
+            // Check for external scripts
+            else if ("script".equals(tag) &&
+                     attrs.containsKey("src")) {
+                scriptSrcs.add(attrs.get("src"));
+            }
+        }
+        // Recursively process children
+        for (INode child : node.getChildren()) {
+            extractLinksAndScripts(child, visited, cssLinks, scriptSrcs);
+        }
     }
 
 
@@ -212,19 +285,29 @@ public final class Tab {
         return CompletableFuture.runAsync(() -> {
             try {
                 js.run(scriptUrl, scriptBody);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {} // Consider better error handling
         });
     }
 
     void render() {
-        style(nodes, rules.entrySet().stream().sorted((selector, b)
-                -> selector.getKey().getPriority()).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
-                (e1, e2) -> e1, LinkedHashMap::new)));
+        // Sort rules by priority before styling
+        Map<ISelector, Map<String, String>> sortedRules = rules.entrySet().stream()
+                .sorted(Comparator.comparingInt(entry -> entry.getKey().getPriority()))
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (e1, e2) -> e1, // Keep existing on merge conflict (though keys should be unique)
+                        LinkedHashMap::new // Preserve order
+                ));
+
+        style(nodes, sortedRules); // Use sorted rules
         document = new DocumentLayout(nodes, Browser.getCanvas());
         document.layout();
         this.displayList = new ArrayList<>();
         paintTree(document, displayList);
     }
+
+    // Remove the old treeToLayoutList method if it's no longer used
 
     public static List<INode> treeToLayoutList(INode tree, List<INode> list) {
         list.add(tree);
@@ -233,6 +316,7 @@ public final class Tab {
         }
         return list;
     }
+
 
     public static List<ILayoutNode> treeToLayoutList(ILayoutNode tree, List<ILayoutNode> list) {
         list.add(tree);
