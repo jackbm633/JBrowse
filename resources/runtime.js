@@ -59,3 +59,15 @@ Event.prototype.preventDefault = function() {
     this.do_default = false;
 }
 
+function XMLHttpRequest() {}
+
+XMLHttpRequest.prototype.open = function(method, url, is_async) {
+    if (is_async) throw Error("Asynchronous XHR is not supported");
+    this.method = method;
+    this.url = url;
+}
+
+XMLHttpRequest.prototype.send = function(body) {
+    this.responseText = Java.from(jsContext.XmlHttpRequestSend(this.method, this.url, body));
+}
+

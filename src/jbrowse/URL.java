@@ -52,7 +52,7 @@ public class URL {
 
     }
 
-    public final String request(String payload) throws NoSuchAlgorithmException, KeyManagementException, IOException {
+    public final Response request(String payload, URL referrer) throws NoSuchAlgorithmException, KeyManagementException, IOException {
         try (Socket s = getSocket()) {
             // Build request using StringBuilder
             StringBuilder requestBuilder = new StringBuilder();
@@ -66,6 +66,23 @@ public class URL {
                 requestBuilder.append("Content-Length: ")
                         .append(payload.getBytes(StandardCharsets.UTF_8).length)
                         .append("\r\n");
+            }
+
+            if (Browser.cookieJar.containsKey(host))
+            {
+                var cookie = Browser.cookieJar.get(host);
+                var allowCookie = true;
+                if (referrer != null && cookie.params().getOrDefault("samesite", "none").equals("lax"))
+                {
+                    if (!method.equals("GET"))
+                    {
+                        allowCookie = Objects.equals(host, referrer.host);
+                    }
+                }
+                if (allowCookie)
+                {
+                    requestBuilder.append(String.format("Cookie: %s\r\n", cookie.cookie()));
+                }
             }
 
             requestBuilder.append("Host: ")
@@ -109,14 +126,45 @@ public class URL {
                 throw new IOException("No response headers");
             }
 
-            // Check for unsupported encodings
+            Map<String, String> headers = new HashMap<>();
+            // Check for unsupported encodings and parse headers
             for (String headerLine : headerLines) {
-                String lowerHeader = headerLine.toLowerCase(Locale.ROOT);
-                if (lowerHeader.startsWith("transfer-encoding:") ||
-                        lowerHeader.startsWith("content-encoding:")) {
+                if (headerLine.trim().isEmpty()) {
+                    continue;
+                }
+                String[] headerParts = headerLine.split(":", 2);
+                if (headerParts.length != 2) {
+                    continue;
+                }
+                String headerName = headerParts[0].trim().toLowerCase(Locale.ROOT);
+                String headerValue = headerParts[1].trim();
+                headers.put(headerName, headerValue);
+
+                if (headerName.equals("transfer-encoding") ||
+                        headerName.equals("content-encoding")) {
                     throw new AssertionError("Cannot support transfer-encoding or content-encoding headers.");
                 }
+
+                if (headerName.equals("set-cookie")) {
+                    var cookie = headerValue;
+                    Map<String, String> params = new HashMap<>();
+                    if (cookie.contains(";")) {
+                        String[] parts = cookie.split(";", 2);
+                        cookie = parts[0];
+                        String rest = parts[1];
+                        String[] paramsArray = rest.split(";");
+                        for (String param : paramsArray) {
+                            String[] keyValue = param.trim().split("=", 2);
+                            String key = keyValue[0].trim().toLowerCase();
+                            String value = keyValue.length > 1 ? keyValue[1].trim().toLowerCase() : "true";
+                            params.put(key, value);
+                        }
+                    }
+                    Browser.cookieJar.put(host, new CookiePair(cookie, params));
+                }
             }
+
+
 
             // Read body
             int bytesRead;
@@ -124,7 +172,7 @@ public class URL {
                 response.write(buffer, 0, bytesRead);
             }
 
-            return response.toString(StandardCharsets.UTF_8);
+            return new Response(response.toString(StandardCharsets.UTF_8), headers);
         }
     }
 
@@ -172,4 +220,7 @@ public class URL {
         return scheme + "://" + host + portPart + path;
     }
 
+    public String getOrigin() {
+        return scheme + "://" + host + ":" + port;
+    }
 }

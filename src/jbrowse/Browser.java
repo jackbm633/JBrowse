@@ -12,14 +12,15 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
-import java.util.Objects;
 
 
 public class Browser {
     private static final JPanel canvas = new JPanel();
     private static final int VSTEP = 18;
+
+    public static Map<String, CookiePair> cookieJar = new HashMap<>();
 
     private static BufferedImage rootSurface = null;
 

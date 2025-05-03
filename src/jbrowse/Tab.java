@@ -41,6 +41,12 @@ public final class Tab {
 
     private List<IDrawCommand> displayList;
 
+    public List<String> getAllowedOrigins() {
+        return allowedOrigins;
+    }
+
+    private List<String> allowedOrigins;
+
     public DocumentLayout getDocument() {
         return document;
     }
@@ -154,15 +160,28 @@ public final class Tab {
     }
 
     public void load(URL url, String payload) throws NoSuchAlgorithmException, IOException, KeyManagementException {
+        // 1. Fetch HTML
+        var response = url.request(payload, this.url);
+        String body = response.content();
         this.url = url;
         history.add(url);
         scroll = 0;
-
-        // 1. Fetch HTML
-        String body = url.request(payload);
-
         // 2. Parse HTML
         nodes = new HtmlParser(body).parse();
+
+        if (response.headers().containsKey("content-security-policy")) {
+            String[] csp = response.headers().get("content-security-policy").split(" ");
+            if (csp.length > 0 && csp[0].equals("default-src")) {
+                allowedOrigins = new ArrayList<>();
+                for (int i = 1; i < csp.length; i++) {
+                    allowedOrigins.add(new URL(csp[i]).getOrigin());
+                }
+            } else {
+                allowedOrigins = null;
+            }
+        } else {
+            allowedOrigins = null;
+        }
 
         // 3. Extract CSS links and JS sources (Traverse once)
         List<String> cssLinks = new ArrayList<>();
@@ -183,9 +202,13 @@ public final class Tab {
                     .map(script -> CompletableFuture.runAsync(() -> {
                         try {
                             var scriptUrl = url.resolve(script);
-                            // Consider making url.request() asynchronous if it's a bottleneck
-                            String scriptBody = scriptUrl.request(null); // Network I/O
-                            js.run(scriptUrl.toString(), scriptBody);   // JS Execution
+                            if (allowedOrigins == null || allowedOrigins.contains(scriptUrl.getOrigin()))
+                            {
+                                // Consider making url.request() asynchronous if it's a bottleneck
+                                String scriptBody = scriptUrl.request(null, url).content(); // Network I/O
+                                js.run(scriptUrl.toString(), scriptBody);   // JS Execution
+                            }
+
                         } catch (Exception e) {
                             // Log or handle exception appropriately
                             System.err.println("Failed to load or run script: " + script + " - " + e.getMessage());
@@ -208,9 +231,12 @@ public final class Tab {
                     .map(link -> CompletableFuture.supplyAsync(() -> {
                         try {
                             URL styleUrl = url.resolve(link);
-                            // Consider making url.request() asynchronous if it's a bottleneck
-                            String styleBody = styleUrl.request(null); // Network I/O
-                            return new CssParser(styleBody).parse(); // CPU-bound parsing
+                            if (allowedOrigins == null || allowedOrigins.contains(styleUrl.getOrigin())) {
+                                // Consider making url.request() asynchronous if it's a bottleneck
+                                String styleBody = styleUrl.request(null, url).content(); // Network I/O
+                                return new CssParser(styleBody).parse(); // CPU-bound parsing
+                            }
+                            return Collections.<ISelector, Map<String, String>>emptyMap();
                         } catch (Exception e) {
                             // Log or handle exception appropriately
                             System.err.println("Failed to load or parse stylesheet: " + link + " - " + e.getMessage());

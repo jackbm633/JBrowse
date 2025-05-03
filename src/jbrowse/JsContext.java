@@ -7,6 +7,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -102,5 +104,15 @@ public class JsContext {
             child.setParent(element);
         }
         tab.render();
+    }
+
+    public String XmlHttpRequestSend(String method, String url, String body) throws NoSuchAlgorithmException, IOException, KeyManagementException {
+        var fullUrl = tab.getUrl().resolve(url);
+
+        if (!fullUrl.getOrigin().equals(tab.getUrl().getOrigin()) || (tab.getAllowedOrigins() != null && !tab.getAllowedOrigins().contains(fullUrl.getOrigin())))
+        {
+            throw new SecurityException("Cross origin XHR request not allowed");
+        }
+        return fullUrl.request(body, tab.getUrl()).content();
     }
 }

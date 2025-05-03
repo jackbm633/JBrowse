@@ -11,18 +11,6 @@ public class Program {
         b.newTab(new URL("https://browser.engineering/visual-effects.html"));
     }
 
-    /**
-     * Loads the content from the given URL.
-     * @param url The URL to fetch content from.
-     * @throws IOException If an I/O error occurs.
-     * @throws NoSuchAlgorithmException If the encryption algorithm is unavailable.
-     * @throws KeyManagementException If there's an issue with key management.
-     */
-    public static void load(URL url) throws IOException, NoSuchAlgorithmException, KeyManagementException {
-        String body = url.request(null);
-        assert body != null; // Ensure the response body is not null
-        show(body);
-    }
 
     /**
      * Prints the visible text content from an HTML body.
