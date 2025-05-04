@@ -11,20 +11,23 @@ import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.stream.Collectors;
 
 public class JsContext {
 
     private final Tab tab;
     private Context context;
-    private Value bindings;
+    private final Timer t = new Timer();
+    private boolean discarded = false;
 
     public JsContext(Tab tab) {
         this.tab = tab;
         try {
             var runtime = getResourceFileAsString("runtime.js");
             context = Context.newBuilder("js").allowAllAccess(true).build();
-            bindings = context.getBindings("js");
+            Value bindings = context.getBindings("js");
             bindings.putMember("jsContext", this);
             context.eval("js", runtime);
         } catch (Exception e) {
@@ -32,7 +35,7 @@ public class JsContext {
         }
     }
 
-    public Object run(String scriptName, String code) {
+    public synchronized Object run(String scriptName, String code) {
         try {
             var eval = context.eval("js", code);
             if (eval.isHostObject()) return eval;
@@ -83,7 +86,7 @@ public class JsContext {
         }
     }
 
-    public boolean dispatchEvent(String type, Element el) {
+    public synchronized boolean dispatchEvent(String type, Element el) {
         var handle = getHandle(el);
         try {
             Value jsHandle = context.eval("js", "new Node(" + handle + ")");
@@ -114,5 +117,35 @@ public class JsContext {
             throw new SecurityException("Cross origin XHR request not allowed");
         }
         return fullUrl.request(body, tab.getUrl()).content();
+    }
+
+    public synchronized void dispatchSetTimeout(int handle) {
+        if (discarded)
+        {
+            return;
+        }
+        context.eval("js", "__runSetTimeout(" + handle + ")");
+    }
+
+    /**
+     * Schedules a task to execute after a specified delay.
+     *
+     * @param handle an identifier for the scheduled task, used to reference or identify the task later
+     * @param time the delay in milliseconds before the task is executed
+     */
+    public synchronized void setTimeout(int handle, int time)
+    {
+        TimerTask task = new TimerTask() {
+            @Override
+            public void run() {
+                dispatchSetTimeout(handle);
+            }
+        };
+        t.schedule(task, time);
+    }
+
+
+    public void setDiscarded(boolean b) {
+        discarded = b;
     }
 }

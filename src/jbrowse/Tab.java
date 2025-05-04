@@ -193,6 +193,10 @@ public final class Tab {
         extractLinksAndScripts(nodes, allNodes, cssLinks, scriptSrcs);
 
         // 4. Initialize JsContext
+        if (js != null)
+        {
+            js.setDiscarded(true);
+        }
         js = new JsContext(this);
 
         System.out.println("JS1");
