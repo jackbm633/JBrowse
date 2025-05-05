@@ -110,7 +110,7 @@ public class JsContext {
         for (INode child : element.getChildren()) {
             child.setParent(element);
         }
-        tab.render();
+        tab.setNeedsRender(true);
     }
 
     public String XmlHttpRequestSend(String method, String url, String body, boolean isAsync, int handle)

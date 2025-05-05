@@ -23,6 +23,12 @@ public final class Tab {
     private static final int VSTEP = 18;
     private static final int SCROLL_STEP = 100;
     private final int tabHeight;
+
+    public void setNeedsRender(boolean needsRender) {
+        this.needsRender = needsRender;
+    }
+
+    private boolean needsRender = false;
     // How far you've scrolled.
     private int scroll = 0;
     private final Map<ISelector, Map<String, String>> defaultStyleSheet;
@@ -113,7 +119,7 @@ public final class Tab {
                         focus = el;
                         el.setFocused(true);
                         el.getAttributes().put("value", "");
-                        render();
+                        needsRender = true;
                         return;
                     }
                     case Element el when el.getTag().equals("button") -> {
@@ -132,7 +138,7 @@ public final class Tab {
             }
             element = element.getParent();
         }
-        render();
+        needsRender = true;
     }
 
     private void submitForm(Element e) throws NoSuchAlgorithmException, IOException, KeyManagementException {
@@ -273,7 +279,7 @@ public final class Tab {
                     .forEach(fetchedRules -> rules.putAll(fetchedRules)); // Merge results into the main 'rules' map
 
             // 10. Call render() only after CSS rules are processed
-            render();
+            needsRender = true;
         }
     }
 
@@ -320,6 +326,10 @@ public final class Tab {
     }
 
     void render() {
+        if (!needsRender)
+        {
+            return;
+        }
         // Sort rules by priority before styling
         Map<ISelector, Map<String, String>> sortedRules = rules.entrySet().stream()
                 .sorted(Comparator.comparingInt(entry -> entry.getKey().getPriority()))
@@ -335,6 +345,7 @@ public final class Tab {
         document.layout();
         this.displayList = new ArrayList<>();
         paintTree(document, displayList);
+        needsRender = false;
     }
 
     // Remove the old treeToLayoutList method if it's no longer used
@@ -492,7 +503,7 @@ public final class Tab {
         if (focus != null) {
             js.dispatchEvent("keydown", focus);
             focus.getAttributes().put("value", focus.getAttributes().get("value") + keyChar);
-            render();
+            needsRender = true;
         }
     }
 

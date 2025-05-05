@@ -22,7 +22,9 @@ public class Browser {
     private static final int VSTEP = 18;
     private static Timer renderTimer;
 
-    private static final double REFRESH_RATE_SEC = 1.0/30.0;
+    private static boolean needsDraw = false;
+
+    private static final double REFRESH_RATE_SEC = 1.0/60;
     public static Map<String, CookiePair> cookieJar = new HashMap<>();
 
     private static BufferedImage rootSurface = null;
@@ -77,14 +79,12 @@ public class Browser {
                     {
                         focus = null;
                         chrome.onClick(e);
-                        rasterChrome();
                     }
                     else {
                         focus = "content";
                         activeTab.onClick(e);
-                        rasterTab();
                     }
-                    draw();
+                    needsDraw = true;
                 } catch (Exception ex) {
                     throw new RuntimeException(ex);
                 }
@@ -100,21 +100,19 @@ public class Browser {
             public void keyPressed(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_DOWN) {
                     activeTab.onKeyDown();
-                    draw();
+                    needsDraw = true;
                 } else {
                     try {
                         if (handleKey(e))
                         {
-                            rasterChrome();
-                            draw();
+                            needsDraw = true;
                         } else if (Objects.equals(focus, "content")) {
                             activeTab.keypress(e.getKeyChar());
                         }
                     } catch (NoSuchAlgorithmException | IOException | KeyManagementException ex) {
                         throw new RuntimeException(ex);
                     }
-                    rasterTab();
-                    draw();
+                    needsDraw = true;
                 }
             }
 
@@ -124,7 +122,12 @@ public class Browser {
             }
         });
 
-        renderTimer = new Timer((int) (REFRESH_RATE_SEC * 1000), e -> rasterAndDraw()); // 1000ms = 1 second
+        renderTimer = new Timer((int) (REFRESH_RATE_SEC * 1000), e -> {
+            if (activeTab != null) {
+                activeTab.render();
+            }
+            rasterAndDraw();
+        }); // 1000ms = 1 second
         renderTimer.start();
 
     }
@@ -152,13 +155,18 @@ public class Browser {
         newTab.load(url, null);
         activeTab = newTab;
         tabs.add(newTab);
-        rasterAndDraw();
+        needsDraw = true;
     }
 
     private void rasterAndDraw() {
-        rasterChrome();
-        rasterTab();
-        draw();
+        if (needsDraw)
+        {
+            rasterChrome();
+            rasterTab();
+            draw();
+            needsDraw = false;
+        }
+
     }
 
     public void rasterChrome() {
@@ -167,7 +175,7 @@ public class Browser {
     }
 
     public void rasterTab() {
-        if (activeTab == null) {
+        if (activeTab == null || activeTab.getDocument() == null) {
             return;
         }
         var tabHeight = activeTab.getDocument().getHeight() + 2*VSTEP;
@@ -178,7 +186,7 @@ public class Browser {
     }
 
     private void draw() {
-        if (activeTab == null) {
+        if (activeTab == null || tabSurface == null) {
             return;
         }
         var tabOffset = chrome.getBottom() - activeTab.getScroll();
