@@ -122,9 +122,17 @@ public class JsContext {
             throw new SecurityException("Cross origin XHR request not allowed");
         }
         Runnable runLoad = () -> {
-            Object[] headersResponse = fullUrl.request(this.tab.url, body);
-            Object response = headersResponse[1];
-            dispatchXhrOnload(response, handle);
+            Response headersResponse = null;
+            try {
+                headersResponse = fullUrl.request(body, this.tab.getUrl());
+            } catch (NoSuchAlgorithmException e) {
+                throw new RuntimeException(e);
+            } catch (KeyManagementException e) {
+                throw new RuntimeException(e);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            dispatchXhrOnload(headersResponse.content(), handle);
         };
         // Assuming the response is not needed in asynchronous case
         if (!isAsync) {
