@@ -3,6 +3,7 @@ package jbrowse;
 import org.jdesktop.swingx.graphics.BlendComposite;
 
 import javax.swing.*;
+import javax.swing.Timer;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
@@ -19,7 +20,9 @@ import java.util.List;
 public class Browser {
     private static final JPanel canvas = new JPanel();
     private static final int VSTEP = 18;
+    private static Timer renderTimer;
 
+    private static final double REFRESH_RATE_SEC = 1.0/30.0;
     public static Map<String, CookiePair> cookieJar = new HashMap<>();
 
     private static BufferedImage rootSurface = null;
@@ -120,6 +123,10 @@ public class Browser {
 
             }
         });
+
+        renderTimer = new Timer((int) (REFRESH_RATE_SEC * 1000), e -> rasterAndDraw()); // 1000ms = 1 second
+        renderTimer.start();
+
     }
 
     private boolean handleKey(KeyEvent e) throws NoSuchAlgorithmException, IOException, KeyManagementException {
@@ -145,6 +152,10 @@ public class Browser {
         newTab.load(url, null);
         activeTab = newTab;
         tabs.add(newTab);
+        rasterAndDraw();
+    }
+
+    private void rasterAndDraw() {
         rasterChrome();
         rasterTab();
         draw();
@@ -156,6 +167,9 @@ public class Browser {
     }
 
     public void rasterTab() {
+        if (activeTab == null) {
+            return;
+        }
         var tabHeight = activeTab.getDocument().getHeight() + 2*VSTEP;
         if (tabSurface == null || tabHeight != tabSurface.getHeight()) {
             tabSurface = new BufferedImage(WIDTH, tabHeight, BufferedImage.TYPE_INT_ARGB);
@@ -164,6 +178,9 @@ public class Browser {
     }
 
     private void draw() {
+        if (activeTab == null) {
+            return;
+        }
         var tabOffset = chrome.getBottom() - activeTab.getScroll();
 
         activeTab.raster((Graphics2D) tabSurface.getGraphics(), chrome.getBottom());
