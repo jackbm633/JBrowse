@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 public class JsContext {
@@ -21,6 +23,8 @@ public class JsContext {
     private Context context;
     private final Timer t = new Timer();
     private boolean discarded = false;
+    private ExecutorService executor = Executors.newSingleThreadExecutor();
+
 
     public JsContext(Tab tab) {
         this.tab = tab;
@@ -109,14 +113,38 @@ public class JsContext {
         tab.render();
     }
 
-    public String XmlHttpRequestSend(String method, String url, String body) throws NoSuchAlgorithmException, IOException, KeyManagementException {
+    public String XmlHttpRequestSend(String method, String url, String body, boolean isAsync, int handle)
+            throws NoSuchAlgorithmException, IOException, KeyManagementException {
         var fullUrl = tab.getUrl().resolve(url);
 
         if (!fullUrl.getOrigin().equals(tab.getUrl().getOrigin()) || (tab.getAllowedOrigins() != null && !tab.getAllowedOrigins().contains(fullUrl.getOrigin())))
         {
             throw new SecurityException("Cross origin XHR request not allowed");
         }
-        return fullUrl.request(body, tab.getUrl()).content();
+        Runnable runLoad = () -> {
+            Object[] headersResponse = fullUrl.request(this.tab.url, body);
+            Object response = headersResponse[1];
+            dispatchXhrOnload(response, handle);
+        };
+        // Assuming the response is not needed in asynchronous case
+        if (!isAsync) {
+            runLoad.run();
+        } else {
+            executor.submit(runLoad);
+        }
+        return null; // Assuming the response is not needed in synchronous case
+    }
+
+    private synchronized void dispatchXhrOnload(Object response, int handle) {
+        if (discarded)
+        {
+            return;
+        }
+        try {
+            context.eval("js", "__runXhrOnload(" + handle + ", " + response + ")");
+        } catch (Exception e) {
+            System.out.println("Could not dispatch XHR onload: " + e.getMessage());
+        }
     }
 
     public synchronized void dispatchSetTimeout(int handle) {
