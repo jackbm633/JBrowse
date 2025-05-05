@@ -26,6 +26,9 @@ public final class Tab {
 
     public void setNeedsRender(boolean needsRender) {
         this.needsRender = needsRender;
+        if (needsRender) {
+            layoutInvalidated = true;
+        }
     }
 
     private boolean needsRender = false;
@@ -66,6 +69,11 @@ public final class Tab {
 
     private Element focus = null;
 
+    private Map<ISelector, Map<String, String>> sortedRules;
+    private INode lastStyledNodes;
+    private boolean rulesChanged;
+    private boolean layoutInvalidated;
+
     public Tab(int tabHeight) throws IOException {
         this.tabHeight = tabHeight;
         defaultStyleSheet = new CssParser(
@@ -76,6 +84,7 @@ public final class Tab {
 
 
     void onClick(MouseEvent e) throws NoSuchAlgorithmException, IOException, KeyManagementException {
+        render();
         var x = e.getX();
         var y = e.getY() - (HEIGHT - tabHeight);
         // We want coordinates relative to scroll.
@@ -326,26 +335,66 @@ public final class Tab {
     }
 
     void render() {
-        if (!needsRender)
-        {
+        if (!needsRender) {
             return;
         }
-        // Sort rules by priority before styling
-        Map<ISelector, Map<String, String>> sortedRules = rules.entrySet().stream()
-                .sorted(Comparator.comparingInt(entry -> entry.getKey().getPriority()))
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        Map.Entry::getValue,
-                        (e1, e2) -> e1, // Keep existing on merge conflict (though keys should be unique)
-                        LinkedHashMap::new // Preserve order
-                ));
+        Browser.getMeasure().time("render");
+        
+        // Cache sorted rules if they haven't changed
+        if (sortedRules == null) {
+            sortedRules = rules.entrySet().stream()
+                    .sorted(Comparator.comparingInt(entry -> entry.getKey().getPriority()))
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey,
+                            Map.Entry::getValue,
+                            (e1, e2) -> e1,
+                            LinkedHashMap::new
+                    ));
+        }
 
-        style(nodes, sortedRules); // Use sorted rules
-        document = new DocumentLayout(nodes, Browser.getCanvas());
-        document.layout();
-        this.displayList = new ArrayList<>();
+        // Only re-style if nodes or rules have changed
+        if (lastStyledNodes != nodes || rulesChanged) {
+            style(nodes, sortedRules);
+            lastStyledNodes = nodes;
+            rulesChanged = false;
+        }
+
+        // Create new document layout only if needed
+        if (document == null || layoutInvalidated) {
+            document = new DocumentLayout(nodes, Browser.getCanvas());
+            document.layout();
+            layoutInvalidated = false;
+        }
+
+        // Reuse display list if possible, otherwise create new one
+        if (displayList == null) {
+            displayList = new ArrayList<>(estimateDisplayListSize());
+        } else {
+            displayList.clear();
+        }
+        
         paintTree(document, displayList);
         needsRender = false;
+        Browser.getMeasure().stop("render");
+    }
+
+    // Add method to mark rules as changed
+    public void markRulesChanged() {
+        rulesChanged = true;
+        needsRender = true;
+    }
+
+    // Helper method to estimate initial display list size
+    private int estimateDisplayListSize() {
+        return nodes != null ? countNodes(nodes) * 2 : 16; // multiply by 2 as each node might generate multiple commands
+    }
+
+    private int countNodes(INode node) {
+        int count = 1;
+        for (INode child : node.getChildren()) {
+            count += countNodes(child);
+        }
+        return count;
     }
 
     // Remove the old treeToLayoutList method if it's no longer used

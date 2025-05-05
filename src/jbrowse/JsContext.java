@@ -33,7 +33,9 @@ public class JsContext {
             context = Context.newBuilder("js").allowAllAccess(true).build();
             Value bindings = context.getBindings("js");
             bindings.putMember("jsContext", this);
+            Browser.getMeasure().time("runtimeJs");
             context.eval("js", runtime);
+            Browser.getMeasure().stop("runtimeJs");
         } catch (Exception e) {
             System.out.println("Could not initialise JS runtime: " + e.getMessage());
         }
@@ -41,7 +43,10 @@ public class JsContext {
 
     public synchronized Object run(String scriptName, String code) {
         try {
+            Browser.getMeasure().time("jsRun");
+
             var eval = context.eval("js", code);
+            Browser.getMeasure().stop("jsRun");
             if (eval.isHostObject()) return eval;
             return null;
         } catch (Exception sex) {
@@ -93,8 +98,12 @@ public class JsContext {
     public synchronized boolean dispatchEvent(String type, Element el) {
         var handle = getHandle(el);
         try {
+            Browser.getMeasure().time("dispatchEvent");
+
             Value jsHandle = context.eval("js", "new Node(" + handle + ")");
             Value newEvent = context.eval("js", "newEvent('" + type + "')");
+            Browser.getMeasure().stop("dispatchEvent");
+
             return !jsHandle.invokeMember("dispatchEvent", newEvent).asBoolean();
         } catch (Exception e) {
             throw new RuntimeException(e);

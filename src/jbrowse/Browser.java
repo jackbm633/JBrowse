@@ -5,10 +5,7 @@ import org.jdesktop.swingx.graphics.BlendComposite;
 import javax.swing.*;
 import javax.swing.Timer;
 import java.awt.*;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.security.KeyManagementException;
@@ -34,6 +31,8 @@ public class Browser {
     private final BufferedImage chromeSurface;
     private static BufferedImage tabSurface;
     private String focus;
+
+    private static final MeasureTime measure = new MeasureTime();
 
     public static BufferedImage getRootSurface() {
         return rootSurface;
@@ -63,6 +62,46 @@ public class Browser {
         window.add(canvas);
         window.pack();
         window.setVisible(true);
+        window.addWindowListener(new WindowListener() {
+            @Override
+            public void windowOpened(WindowEvent e) {
+
+            }
+
+
+            @Override
+            public void windowClosing(WindowEvent e) {
+                measure.finish();
+            }
+
+            @Override
+            public void windowClosed(WindowEvent e) {
+
+            }
+
+            @Override
+            public void windowIconified(WindowEvent e) {
+
+            }
+
+            @Override
+            public void windowDeiconified(WindowEvent e) {
+
+            }
+
+            @Override
+            public void windowActivated(WindowEvent e) {
+
+            }
+
+            @Override
+            public void windowDeactivated(WindowEvent e) {
+
+            }
+
+
+        });
+
         Browser.rootSurface = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_ARGB);
 
         this.chrome = new Chrome(this);
@@ -161,10 +200,13 @@ public class Browser {
     private void rasterAndDraw() {
         if (needsDraw)
         {
+            Browser.getMeasure().time("rasterAndDraw");
             rasterChrome();
             rasterTab();
             draw();
             needsDraw = false;
+            Browser.getMeasure().stop("rasterAndDraw");
+
         }
 
     }
@@ -225,4 +267,7 @@ public class Browser {
         }
     }
 
+    public static MeasureTime getMeasure() {
+        return measure;
+    }
 }
