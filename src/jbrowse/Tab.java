@@ -338,6 +338,8 @@ public final class Tab {
         if (!needsRender) {
             return;
         }
+        needsRender = false;
+        js.run("jsCallback", "__runRAFHandlers()");
         Browser.getMeasure().time("render");
         
         // Cache sorted rules if they haven't changed
@@ -374,7 +376,6 @@ public final class Tab {
         }
         
         paintTree(document, displayList);
-        needsRender = false;
         Browser.getMeasure().stop("render");
     }
 

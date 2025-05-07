@@ -71,3 +71,22 @@ XMLHttpRequest.prototype.send = function(body) {
     this.responseText = Java.from(jsContext.XmlHttpRequestSend(this.method, this.url, body));
 }
 
+RAF_LISTENERS = [];
+
+function requestAnimationFrame(fn) {
+    console.log("AniFrame")
+    RAF_LISTENERS.push(fn);
+    jsContext.requestAnimationFrame();
+}
+
+function __runRAFHandlers() {
+    var handlers_copy = RAF_LISTENERS;
+    console.log(handlers_copy)
+    RAF_LISTENERS = [];
+    for (var i = 0; i < handlers_copy.length; i++) {
+        handlers_copy[i]();
+    }
+}
+
+
+

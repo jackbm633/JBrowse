@@ -30,7 +30,10 @@ public class JsContext {
         this.tab = tab;
         try {
             var runtime = getResourceFileAsString("runtime.js");
-            context = Context.newBuilder("js").allowAllAccess(true).build();
+            context = Context.newBuilder("js")
+                    .allowAllAccess(true)
+                    .option("inspect", "9229")  // Port for Chrome DevTools
+                    .build();
             Value bindings = context.getBindings("js");
             bindings.putMember("jsContext", this);
             Browser.getMeasure().time("runtimeJs");
@@ -192,5 +195,10 @@ public class JsContext {
 
     public void setDiscarded(boolean b) {
         discarded = b;
+    }
+
+    public void requestAnimationFrame()
+    {
+        tab.setNeedsRender(true);
     }
 }
