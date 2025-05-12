@@ -4,58 +4,72 @@ import java.io.FileWriter;
 import java.io.IOException;
 
 public class MeasureTime {
-    FileWriter file;
+    private final FileWriter file;
+    private final Object lock = new Object(); // Lock for synchronizing access to the file
 
-    public MeasureTime() {
+    public MeasureTime() throws IOException {
+        file = new FileWriter("browser.trace");
         try {
-            file = new FileWriter("browser.trace");
-            file.write("{\"traceEvents\": [");
             long ts = System.nanoTime() / 1000; // Get current time in microseconds
-            file.write(
-                    "{ \"name\": \"process_name\"," +
-                            "\"ph\": \"M\"," +
-                            "\"ts\": " + ts + "," +
-                            "\"pid\": 1, \"cat\": \"__metadata\"," +
-                            "\"args\": {\"name\": \"Browser\"}}");
-            file.flush();
+            synchronized (lock) {
+                file.write("{\"traceEvents\": [");
+                file.write(
+                        "{ \"name\": \"process_name\"," +
+                                "\"ph\": \"M\"," +
+                                "\"ts\": " + ts + "," +
+                                "\"pid\": 1, \"cat\": \"__metadata\"," +
+                                "\"args\": {\"name\": \"Browser\"}}");
+                file.flush();
+            }
         } catch (IOException e) {
-            e.printStackTrace();
-            // Handle the exception appropriately, e.g., log an error or inform the user.
+            // Close the file if an exception occurs during initialization
+            try {
+                file.close();
+            } catch (IOException ex) {
+                ex.printStackTrace(); // Log the error during close
+            }
+            throw e; // Re-throw the original exception
         }
     }
 
-    public synchronized void time(String name) {
+    public void time(String name) {
         try {
             long ts = System.nanoTime() / 1000; // Convert nanoseconds to microseconds
-            this.file.write(
-                    ", { \"ph\": \"B\", \"cat\": \"_\"," +
-                            "\"name\": \"" + name + "\"," +
-                            "\"ts\": " + ts + "," +
-                            "\"pid\": 1, \"tid\": " + Thread.currentThread().threadId() + "}");
-            this.file.flush();
+            synchronized (lock) {
+                file.write(
+                        ", { \"ph\": \"B\", \"cat\": \"_\"," +
+                                "\"name\": \"" + name + "\"," +
+                                "\"ts\": " + ts + "," +
+                                "\"pid\": 1, \"tid\": " + Thread.currentThread().threadId() + "}");
+                file.flush();
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public synchronized void stop(String name) {
+    public void stop(String name) {
         try {
             long ts = System.nanoTime() / 1000; // Convert nanoseconds to microseconds
-            file.write(
-                    ", { \"ph\": \"E\", \"cat\": \"_\"," +
-                            "\"name\": \"" + name + "\"," +
-                            "\"ts\": " + ts + "," +
-                            "\"pid\": 1, \"tid\": " + Thread.currentThread().threadId() + "}");
-            file.flush();
+            synchronized (lock) {
+                file.write(
+                        ", { \"ph\": \"E\", \"cat\": \"_\"," +
+                                "\"name\": \"" + name + "\"," +
+                                "\"ts\": " + ts + "," +
+                                "\"pid\": 1, \"tid\": " + Thread.currentThread().threadId() + "}");
+                file.flush();
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public synchronized void finish() {
+    public void finish() {
         try {
-            file.write("]}");
-            file.close();
+            synchronized (lock) {
+                file.write("]}");
+                file.close();
+            }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

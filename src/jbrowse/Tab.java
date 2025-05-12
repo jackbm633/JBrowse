@@ -9,10 +9,7 @@ import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 import static java.util.Map.entry;
@@ -400,7 +397,7 @@ public final class Tab {
 
         // Reuse display list if possible, otherwise create new one
         if (displayList == null) {
-            displayList = new ArrayList<>(estimateDisplayListSize());
+            displayList = new CopyOnWriteArrayList<>();
         } else {
             displayList.clear();
         }
@@ -486,9 +483,11 @@ public final class Tab {
 
         // Determine scale factor for HiDPI displays
         // Draw all display list items onto the buffered image
-        for (IDrawCommand it : this.displayList) {
-            it.draw(g2D, 0);
-        }
+            for (IDrawCommand it : this.displayList) {
+                it.draw(g2D, 0);
+            }
+
+
 
         g2D.dispose();
 

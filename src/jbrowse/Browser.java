@@ -35,7 +35,15 @@ public class Browser {
     private static BufferedImage tabSurface;
     private String focus;
 
-    private static final MeasureTime measure = new MeasureTime();
+    private static final MeasureTime measure;
+
+    static {
+        try {
+            measure = new MeasureTime();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     public static BufferedImage getRootSurface() {
         return rootSurface;
