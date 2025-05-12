@@ -3,9 +3,9 @@ package jbrowse;
 import java.util.List;
 
 public interface ILayoutNode {
-    public void layout();
+    void layout();
 
-    public int getX();
+    int getX();
 
     int getWidth();
 

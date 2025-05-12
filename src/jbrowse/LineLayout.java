@@ -57,7 +57,7 @@ public class LineLayout implements ILayoutNode {
         int baseline = (int) (y + 1.25 * maxAscent);
         for (ILayoutNode word : children) {
             if (word instanceof TextLayout wordLayout){
-                wordLayout.setY(baseline - ((TextLayout) word).getFontMetrics().getAscent());
+                wordLayout.setY(baseline - wordLayout.getFontMetrics().getAscent());
             } else if (word instanceof InputLayout il) {
                 il.setY(baseline - il.getFontMetrics().getAscent());
             }

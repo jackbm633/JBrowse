@@ -4,7 +4,7 @@ import java.util.Objects;
 
 public class TagSelector implements ISelector {
 
-    private String tag;
+    private final String tag;
     public TagSelector(String tag) {
         this.tag = tag;
     }

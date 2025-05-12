@@ -59,9 +59,9 @@ public class BlockLayout implements ILayoutNode {
     private static final int HSTEP = 13;
     private static final int VSTEP = 18;
     private int cursorX = HSTEP;
-    private int cursorY = VSTEP;
-    private int fontStyle = Font.PLAIN;
-    private int fontSize = 16;
+    private final int cursorY = VSTEP;
+    private final int fontStyle = Font.PLAIN;
+    private final int fontSize = 16;
     private int x;
     private int y;
     private int width;

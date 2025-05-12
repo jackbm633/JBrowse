@@ -10,7 +10,7 @@ public class Text implements INode {
     private final String text; 
     private INode parent;
     private final List<INode> children = new ArrayList<>();
-    private Map<String, String> style = new HashMap<>();
+    private final Map<String, String> style = new HashMap<>();
 
     public Text(String text, INode parent) {
         this.text = text;
@@ -57,6 +57,6 @@ public class Text implements INode {
     }
 
     public String toString() {
-        return text.toString();
+        return text;
     }
 }

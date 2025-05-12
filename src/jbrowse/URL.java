@@ -10,9 +10,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
 public class URL {
-    private String scheme;
+    private final String scheme;
     private String host;
-    private String path;
+    private final String path;
     private int port;
     public URL (String url)
     {

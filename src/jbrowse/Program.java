@@ -8,7 +8,7 @@ public class Program {
     public static void main(String[] args) throws IOException, NoSuchAlgorithmException, KeyManagementException {
         Browser b = new Browser();
         // Open a new tab with the specified URL
-        b.newTab(new URL("http://localhost:5500"));
+        b.newTab(new URL("http://localhost:8000"));
     }
 
 

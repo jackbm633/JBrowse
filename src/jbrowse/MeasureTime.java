@@ -24,35 +24,35 @@ public class MeasureTime {
         }
     }
 
-    public void time(String name) {
+    public synchronized void time(String name) {
         try {
             long ts = System.nanoTime() / 1000; // Convert nanoseconds to microseconds
             this.file.write(
                     ", { \"ph\": \"B\", \"cat\": \"_\"," +
                             "\"name\": \"" + name + "\"," +
                             "\"ts\": " + ts + "," +
-                            "\"pid\": 1, \"tid\": 1}");
+                            "\"pid\": 1, \"tid\": " + Thread.currentThread().threadId() + "}");
             this.file.flush();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public void stop(String name) {
+    public synchronized void stop(String name) {
         try {
             long ts = System.nanoTime() / 1000; // Convert nanoseconds to microseconds
             file.write(
                     ", { \"ph\": \"E\", \"cat\": \"_\"," +
                             "\"name\": \"" + name + "\"," +
                             "\"ts\": " + ts + "," +
-                            "\"pid\": 1, \"tid\": 1}");
+                            "\"pid\": 1, \"tid\": " + Thread.currentThread().threadId() + "}");
             file.flush();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public void finish() {
+    public synchronized void finish() {
         try {
             file.write("]}");
             file.close();

@@ -23,7 +23,7 @@ public class JsContext {
     private Context context;
     private final Timer t = new Timer();
     private boolean discarded = false;
-    private ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
 
     public JsContext(Tab tab) {
@@ -32,7 +32,6 @@ public class JsContext {
             var runtime = getResourceFileAsString("runtime.js");
             context = Context.newBuilder("js")
                     .allowAllAccess(true)
-                    .option("inspect", "9229")  // Port for Chrome DevTools
                     .build();
             Value bindings = context.getBindings("js");
             bindings.putMember("jsContext", this);

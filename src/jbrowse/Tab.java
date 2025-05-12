@@ -11,6 +11,7 @@ import java.util.*;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
@@ -23,6 +24,9 @@ public final class Tab {
     private static final int VSTEP = 18;
     private static final int SCROLL_STEP = 100;
     private final int tabHeight;
+    private final ExecutorService mainThread;
+    private volatile boolean isLoading = false;
+
 
     public void setNeedsRender(boolean needsRender) {
         this.needsRender = needsRender;
@@ -39,7 +43,7 @@ public final class Tab {
     private static final Map<FontCombo, Font> fontCache = new HashMap<>();
     private static final Map<Font, FontMetrics> fontMetricsCache = new HashMap<>();
 
-    private Stack<URL> history = new Stack<>();
+    private final Stack<URL> history = new Stack<>();
 
     private final Map<String, String> inheritedProperties = Map.ofEntries(
         entry("font-size", "16px"),
@@ -76,15 +80,33 @@ public final class Tab {
 
     public Tab(int tabHeight) throws IOException {
         this.tabHeight = tabHeight;
+        this.mainThread = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "Tab-Main-Thread");
+            t.setDaemon(true);
+            return t;
+        });
+
         defaultStyleSheet = new CssParser(
                 new String(Objects.requireNonNull(Tab.class.getResourceAsStream("/browser.css")).readAllBytes()))
                 .parse();
+    }
 
+    public void load(URL url, String payload) {
+        isLoading = true;
+        mainThread.execute(() -> {
+            try {
+                loadInternal(url, payload);
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                isLoading = false;
+            }
+        });
     }
 
 
     void onClick(MouseEvent e) throws NoSuchAlgorithmException, IOException, KeyManagementException {
-        render();
+        renderInternal();
         var x = e.getX();
         var y = e.getY() - (HEIGHT - tabHeight);
         // We want coordinates relative to scroll.
@@ -120,7 +142,7 @@ public final class Tab {
                     case Element el when el.getTag().equals("a") && el.getAttributes().containsKey("href") -> {
                         if (js.dispatchEvent("click", el)) return;
                         url = url.resolve(el.getAttributes().get("href"));
-                        load(url, null);
+                        loadInternal(url, null);
                         return;
                     }
                     case Element el when el.getTag().equals("input") -> {
@@ -165,7 +187,7 @@ public final class Tab {
             }
         }
         url = url.resolve(e.getAttributes().get("action"));
-        load(url, body.toString());
+        loadInternal(url, body.toString());
     }
 
     public void onKeyDown()
@@ -174,7 +196,7 @@ public final class Tab {
         scroll = Math.min(scroll + SCROLL_STEP, maxY);
     }
 
-    public void load(URL url, String payload) throws NoSuchAlgorithmException, IOException, KeyManagementException {
+    private void loadInternal(URL url, String payload) throws NoSuchAlgorithmException, IOException, KeyManagementException {
         // 1. Fetch HTML
         var response = url.request(payload, this.url);
         String body = response.content();
@@ -334,7 +356,18 @@ public final class Tab {
         });
     }
 
+    // Modify render to ensure it runs on the tab's main thread
     void render() {
+        if (!mainThread.isShutdown() && needsRender) {
+            mainThread.execute(() -> {
+                if (Thread.currentThread().getName().equals("Tab-Main-Thread")) {
+                    renderInternal();
+                }
+            });
+        }
+    }
+
+    private void renderInternal() {
         if (!needsRender) {
             return;
         }
@@ -354,19 +387,16 @@ public final class Tab {
                     ));
         }
 
-        // Only re-style if nodes or rules have changed
-        if (lastStyledNodes != nodes || rulesChanged) {
-            style(nodes, sortedRules);
-            lastStyledNodes = nodes;
-            rulesChanged = false;
-        }
+        style(nodes, sortedRules);
+
+
 
         // Create new document layout only if needed
-        if (document == null || layoutInvalidated) {
-            document = new DocumentLayout(nodes, Browser.getCanvas());
-            document.layout();
-            layoutInvalidated = false;
-        }
+
+        document = new DocumentLayout(nodes, Browser.getCanvas());
+        document.layout();
+        layoutInvalidated = false;
+
 
         // Reuse display list if possible, otherwise create new one
         if (displayList == null) {
@@ -532,7 +562,7 @@ public final class Tab {
         if (fontMetricsCache.containsKey(f)) {
             return fontMetricsCache.get(f);
         }
-        fontMetricsCache.put(f, ((Graphics2D)Browser.getRootSurface().getGraphics()).getFontMetrics(f));
+        fontMetricsCache.put(f, Browser.getRootSurface().getGraphics().getFontMetrics(f));
         return fontMetricsCache.get(f);
     }
 
@@ -545,7 +575,7 @@ public final class Tab {
         if (history.size() >= 2) {
             history.pop();
             var back = history.pop();
-            load(back, null);
+            loadInternal(back, null);
         }
     }
 

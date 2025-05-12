@@ -12,6 +12,9 @@ import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 
 public class Browser {
@@ -21,7 +24,7 @@ public class Browser {
 
     private static boolean needsDraw = false;
 
-    private static final double REFRESH_RATE_SEC = 1.0/60;
+    private static final double REFRESH_RATE_SEC = 1.0/30;
     public static Map<String, CookiePair> cookieJar = new HashMap<>();
 
     private static BufferedImage rootSurface = null;
@@ -51,6 +54,8 @@ public class Browser {
 
     private Tab activeTab;
 
+    private final ExecutorService browserThread;
+
     public Browser() {
         this.tabs = new ArrayList<>();
         this.activeTab = null;
@@ -71,7 +76,9 @@ public class Browser {
 
             @Override
             public void windowClosing(WindowEvent e) {
+
                 measure.finish();
+                shutdown();
             }
 
             @Override
@@ -107,7 +114,7 @@ public class Browser {
         this.chrome = new Chrome(this);
 
         this.chromeSurface = new BufferedImage(WIDTH, chrome.getBottom(), BufferedImage.TYPE_INT_ARGB);
-        this.tabSurface = null;
+        tabSurface = null;
 
         canvas.addMouseListener(new MouseAdapter() {
             @Override
@@ -161,13 +168,26 @@ public class Browser {
             }
         });
 
+        // Initialize single browser thread for chrome and raster-and-draw operations
+        this.browserThread = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "Browser-Thread");
+            t.setDaemon(true);
+            return t;
+        });
+
+
+
+        // Modify the render timer to use browser thread
         renderTimer = new Timer((int) (REFRESH_RATE_SEC * 1000), e -> {
-            if (activeTab != null) {
-                activeTab.render();
-            }
-            rasterAndDraw();
-        }); // 1000ms = 1 second
+            browserThread.execute(() -> {
+                if (activeTab != null) {
+                    activeTab.render();
+                }
+                rasterAndDraw();
+            });
+        });
         renderTimer.start();
+
 
     }
 
@@ -198,15 +218,13 @@ public class Browser {
     }
 
     private void rasterAndDraw() {
-        if (needsDraw)
-        {
+        if (!browserThread.isShutdown() && Thread.currentThread().getName().equals("Browser-Thread")) {
             Browser.getMeasure().time("rasterAndDraw");
             rasterChrome();
             rasterTab();
             draw();
             needsDraw = false;
             Browser.getMeasure().stop("rasterAndDraw");
-
         }
 
     }
@@ -227,7 +245,7 @@ public class Browser {
         var graphics = (Graphics2D) tabSurface.getGraphics();
     }
 
-    private void draw() {
+    public void draw() {
         if (activeTab == null || tabSurface == null) {
             return;
         }
@@ -270,4 +288,16 @@ public class Browser {
     public static MeasureTime getMeasure() {
         return measure;
     }
+    // Add cleanup method
+    public void shutdown() {
+        browserThread.shutdown();
+        try {
+            if (!browserThread.awaitTermination(5, TimeUnit.SECONDS)) {
+                browserThread.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            browserThread.shutdownNow();
+        }
+    }
+
 }

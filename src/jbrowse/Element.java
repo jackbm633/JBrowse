@@ -11,7 +11,7 @@ public class Element implements INode {
     private final Map<String, String> attributes;
     private INode parent;
     private final List<INode> children = new ArrayList<>();
-    private Map<String, String> style = new HashMap<>();
+    private final Map<String, String> style = new HashMap<>();
     private boolean isFocused;
 
     public Element(String tag, Map<String, String> attributes, INode parent){
