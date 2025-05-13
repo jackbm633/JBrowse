@@ -79,7 +79,7 @@ public class Chrome {
         drawCommands.add(new DrawOutline(addressRect, Color.BLACK, 1));
         if (Objects.equals(focus, "address bar")) {
             drawCommands.add(new DrawText(addressRect.x + padding, addressRect.y, addressBar, font, fontMetrics, Color.BLACK));
-        } else {
+        } else if (browser.getActiveTab().getUrl() != null){
             var url = browser.getActiveTab().getUrl().toString();
             drawCommands.add(new DrawText(addressRect.x + padding, addressRect.y, url, font, fontMetrics, Color.BLACK));
         }

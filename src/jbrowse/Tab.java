@@ -473,6 +473,7 @@ public final class Tab {
 
 
     public void raster(Graphics2D g2D, int offset) {
+        if (this.document == null || this.displayList == null) {return;}
         // Create a BufferedImage to draw on
         g2D.setBackground(Color.WHITE);
         g2D.clearRect(0, 0, WIDTH, document.getHeight() + VSTEP);
