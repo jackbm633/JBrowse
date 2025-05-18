@@ -7,6 +7,7 @@ import javax.swing.Timer;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
+import java.awt.image.VolatileImage;
 import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
@@ -27,12 +28,12 @@ public class Browser {
     private static final double REFRESH_RATE_SEC = 1.0/30;
     public static Map<String, CookiePair> cookieJar = new HashMap<>();
 
-    private static BufferedImage rootSurface = null;
+    private static VolatileImage rootSurface = null;
 
     private static final int WIDTH = 800;
     private static final int HEIGHT = 600;
-    private final BufferedImage chromeSurface;
-    private static BufferedImage tabSurface;
+    private VolatileImage chromeSurface;
+    private static VolatileImage tabSurface;
     private String focus;
 
     private static final MeasureTime measure;
@@ -45,7 +46,7 @@ public class Browser {
         }
     }
 
-    public static BufferedImage getRootSurface() {
+    public static VolatileImage getRootSurface() {
         return rootSurface;
     }
 
@@ -117,11 +118,15 @@ public class Browser {
 
         });
 
-        Browser.rootSurface = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_ARGB);
+        // Create the VolatileImage instances
+        GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        GraphicsConfiguration gc = ge.getDefaultScreenDevice().getDefaultConfiguration();
+        
+        Browser.rootSurface = gc.createCompatibleVolatileImage(WIDTH, HEIGHT, Transparency.TRANSLUCENT);
 
         this.chrome = new Chrome(this);
 
-        this.chromeSurface = new BufferedImage(WIDTH, chrome.getBottom(), BufferedImage.TYPE_INT_ARGB);
+        this.chromeSurface = gc.createCompatibleVolatileImage(WIDTH, chrome.getBottom(), Transparency.TRANSLUCENT);
         tabSurface = null;
 
         canvas.addMouseListener(new MouseAdapter() {
@@ -186,7 +191,7 @@ public class Browser {
 
 
         // Modify the render timer to use browser thread
-        renderTimer = new Timer((int) (REFRESH_RATE_SEC * 1000), e -> {
+        renderTimer = new Timer((int) (REFRESH_RATE_SEC), e -> {
             browserThread.execute(() -> {
                 if (activeTab != null) {
                     activeTab.render();
@@ -238,19 +243,50 @@ public class Browser {
     }
 
     public void rasterChrome() {
-        var graphics = (Graphics2D) chromeSurface.getGraphics();
+        // Check if the volatile image needs to be recreated
+        if (chromeSurface.validate(GraphicsEnvironment.getLocalGraphicsEnvironment()
+                .getDefaultScreenDevice().getDefaultConfiguration()) == VolatileImage.IMAGE_INCOMPATIBLE) {
+            // Old surface is no longer usable, recreate it
+            GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+            GraphicsConfiguration gc = ge.getDefaultScreenDevice().getDefaultConfiguration();
+            chromeSurface.flush();
+            chromeSurface.getGraphics().dispose();
+            chromeSurface = gc.createCompatibleVolatileImage(WIDTH, chrome.getBottom(), Transparency.TRANSLUCENT);
+        }
+        
+        var graphics = chromeSurface.createGraphics();
         graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        // Clear the surface before drawing
+        graphics.setComposite(AlphaComposite.Clear);
+        graphics.fillRect(0, 0, chromeSurface.getWidth(), chromeSurface.getHeight());
+        graphics.setComposite(AlphaComposite.SrcOver);
     }
 
     public void rasterTab() {
         if (activeTab == null || activeTab.getDocument() == null) {
             return;
         }
+        
         var tabHeight = activeTab.getDocument().getHeight() + 2*VSTEP;
+        GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        GraphicsConfiguration gc = ge.getDefaultScreenDevice().getDefaultConfiguration();
+        
         if (tabSurface == null || tabHeight != tabSurface.getHeight()) {
-            tabSurface = new BufferedImage(WIDTH, tabHeight, BufferedImage.TYPE_INT_ARGB);
+            // Dispose the old image if it exists
+            if (tabSurface != null) {
+                tabSurface.flush();
+            }
+            tabSurface = gc.createCompatibleVolatileImage(WIDTH, tabHeight, Transparency.TRANSLUCENT);
+        } else if (tabSurface.validate(gc) == VolatileImage.IMAGE_INCOMPATIBLE) {
+            tabSurface.flush();
+            tabSurface = gc.createCompatibleVolatileImage(WIDTH, tabHeight, Transparency.TRANSLUCENT);
         }
-        var graphics = (Graphics2D) tabSurface.getGraphics();
+        
+        var graphics = tabSurface.createGraphics();
+        // Clear the surface before drawing
+        graphics.setComposite(AlphaComposite.Clear);
+        graphics.fillRect(0, 0, tabSurface.getWidth(), tabSurface.getHeight());
+        graphics.setComposite(AlphaComposite.SrcOver);
     }
 
     public void draw() {
@@ -259,8 +295,8 @@ public class Browser {
         }
         var tabOffset = chrome.getBottom() - activeTab.getScroll();
 
-        activeTab.raster((Graphics2D) tabSurface.getGraphics(), chrome.getBottom());
-        var chromeGraphics = (Graphics2D) chromeSurface.getGraphics();
+        activeTab.raster(tabSurface.createGraphics(), chrome.getBottom());
+        var chromeGraphics = chromeSurface.createGraphics();
         chromeGraphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
         for (IDrawCommand command : chrome.paint())
         {
@@ -268,15 +304,27 @@ public class Browser {
         }
 
         chrome.paint();
-        var g2d = (Graphics2D) rootSurface.getGraphics();
+        
+        // Check if the root surface needs to be recreated
+        GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment()
+                .getDefaultScreenDevice().getDefaultConfiguration();
+        if (rootSurface.validate(gc) == VolatileImage.IMAGE_INCOMPATIBLE) {
+            rootSurface.flush();
+            rootSurface = gc.createCompatibleVolatileImage(WIDTH, HEIGHT, Transparency.TRANSLUCENT);
+        }
+        
+        var g2d = rootSurface.createGraphics();
         g2d.setBackground(Color.WHITE);
         g2d.clearRect(0, 0, WIDTH, HEIGHT);
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         g2d.drawImage(tabSurface, 0, tabOffset, null);
         g2d.drawImage(chromeSurface, 0, 0, null);
+        g2d.dispose();
+        
         var canvasGraphics = ((Graphics2D)canvas.getGraphics());
         canvasGraphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         canvasGraphics.drawImage(rootSurface, 0, 0, null);
+        canvasGraphics.dispose();
     }
 
     public void setActiveTab(Tab tab) {
@@ -296,6 +344,7 @@ public class Browser {
     public static MeasureTime getMeasure() {
         return measure;
     }
+    
     // Add cleanup method
     public void shutdown() {
         browserThread.shutdown();
@@ -306,6 +355,16 @@ public class Browser {
         } catch (InterruptedException e) {
             browserThread.shutdownNow();
         }
+        
+        // Dispose VolatileImage resources
+        if (rootSurface != null) {
+            rootSurface.flush();
+        }
+        if (chromeSurface != null) {
+            chromeSurface.flush();
+        }
+        if (tabSurface != null) {
+            tabSurface.flush();
+        }
     }
-
 }
