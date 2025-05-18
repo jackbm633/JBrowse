@@ -2,6 +2,7 @@ package jbrowse;
 
 import java.awt.*;
 import java.awt.event.MouseEvent;
+import java.awt.image.VolatileImage;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -403,6 +404,7 @@ public final class Tab {
         }
         
         paintTree(document, displayList);
+        Browser.needsDraw = true;
         Browser.getMeasure().stop("render");
     }
 
@@ -473,26 +475,63 @@ public final class Tab {
 
 
     public void raster(Graphics2D g2D, int offset) {
-        if (this.document == null || this.displayList == null) {return;}
-        // Create a BufferedImage to draw on
-        g2D.setBackground(Color.WHITE);
-        g2D.clearRect(0, 0, WIDTH, document.getHeight() + VSTEP);
-        g2D.setColor(Color.BLACK);
+        if (this.document == null || this.displayList == null) {
+            return;
+        }
 
-        // Enable anti-aliasing and set rendering hints
-        g2D.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
+        // Get the graphics configuration for hardware acceleration
+        GraphicsConfiguration gc = g2D.getDeviceConfiguration();
 
-        // Determine scale factor for HiDPI displays
-        // Draw all display list items onto the buffered image
-            for (IDrawCommand it : this.displayList) {
-                it.draw(g2D, 0);
+        // Create a volatile image for hardware-accelerated rendering
+        VolatileImage volatileImage = gc.createCompatibleVolatileImage(
+                WIDTH,
+                document.getHeight() + VSTEP,
+                Transparency.TRANSLUCENT
+        );
+
+        do {
+            // Check if we need to recreate the volatile image
+            if (volatileImage.validate(gc) == VolatileImage.IMAGE_INCOMPATIBLE) {
+                volatileImage = gc.createCompatibleVolatileImage(
+                        WIDTH,
+                        document.getHeight() + VSTEP,
+                        Transparency.TRANSLUCENT
+                );
             }
 
+            Graphics2D volGraphics = volatileImage.createGraphics();
+            try {
+                // Set up the graphics context
+                volGraphics.setBackground(Color.WHITE);
+                volGraphics.clearRect(0, 0, WIDTH, document.getHeight() + VSTEP);
+                volGraphics.setColor(Color.BLACK);
 
+                // Enable high-quality rendering
+                volGraphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                        RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
+                volGraphics.setRenderingHint(RenderingHints.KEY_RENDERING,
+                        RenderingHints.VALUE_RENDER_QUALITY);
+                volGraphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                        RenderingHints.VALUE_ANTIALIAS_ON);
 
-        g2D.dispose();
+                // Draw all display list items onto the volatile image
+                for (IDrawCommand cmd : this.displayList) {
+                    cmd.draw(volGraphics, 0);
+                }
 
+            } finally {
+                volGraphics.dispose();
+            }
+
+            // Draw the accelerated image to the destination graphics
+            g2D.drawImage(volatileImage, 0, 0, null);
+
+        } while (volatileImage.contentsLost());
+
+        // Clean up
+        volatileImage.flush();
     }
+
 
     public void style(INode node, Map<ISelector, Map<String, String>> rules) {
         node.getStyle().clear();

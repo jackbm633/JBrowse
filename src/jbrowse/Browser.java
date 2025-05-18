@@ -22,7 +22,7 @@ public class Browser {
     private static final int VSTEP = 18;
     private static Timer renderTimer;
 
-    private static boolean needsDraw = false;
+    static boolean needsDraw = false;
 
     private static final double REFRESH_RATE_SEC = 1.0/30;
     public static Map<String, CookiePair> cookieJar = new HashMap<>();
@@ -226,7 +226,7 @@ public class Browser {
     }
 
     private void rasterAndDraw() {
-        if (!browserThread.isShutdown() && Thread.currentThread().getName().equals("Browser-Thread")) {
+        if (needsDraw && !browserThread.isShutdown() && Thread.currentThread().getName().equals("Browser-Thread")) {
             Browser.getMeasure().time("rasterAndDraw");
             rasterChrome();
             rasterTab();

@@ -85,5 +85,10 @@ function __runRAFHandlers() {
     }
 }
 
+Object.defineProperty(Node.prototype, 'style', {
+    set: function(s) {
 
+        jsContext.styleSet(this.handle, s.toString());
+    }
+});
 

@@ -191,6 +191,13 @@ public class JsContext {
         t.schedule(task, time);
     }
 
+    public void styleSet(int handle, String style)
+    {
+        var element = (Element)getNode(handle);
+        element.getAttributes().put("style", style);
+        tab.setNeedsRender(true);
+    }
+
 
     public void setDiscarded(boolean b) {
         discarded = b;
